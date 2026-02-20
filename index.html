@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body style="margin:0;background:#000;">
@@ -8,7 +9,6 @@
   <script>
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
-
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, req => {
       const url = req.media.contentId;
       const video = document.getElementById('vid');
@@ -19,9 +19,7 @@
       }
       return req;
     });
-
     ctx.start();
   </script>
-  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 </body>
 </html>
