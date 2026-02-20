@@ -10,14 +10,18 @@
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, req => {
-      const url = req.media.contentId;
+      const url = req.media.contentUrl || req.media.contentId;
+      console.log('Loading URL:', url);
       const video = document.getElementById('vid');
       if (Hls.isSupported()) {
-        const hls = new Hls();
+        const hls = new Hls({ debug: true });
         hls.loadSource(url);
         hls.attachMedia(video);
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('HLS error:', data);
+        });
       }
-      return req;
+      return null; // Return null to prevent default handling
     });
     ctx.start();
   </script>
