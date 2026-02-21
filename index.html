@@ -6,10 +6,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
-    video {
-      width: 100%; height: 100%;
-      object-fit: contain;
-    }
+    video { width: 100%; height: 100%; object-fit: contain; }
     #status {
       position: absolute; top: 20px; left: 50%;
       transform: translateX(-50%);
@@ -23,31 +20,28 @@
   <video id="vid" autoplay playsinline muted></video>
   <div id="status">Waiting for stream...</div>
 
-  <!-- Cast Receiver SDK -->
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 
   <script>
     const video = document.getElementById('vid');
     const status = document.getElementById('status');
 
-    // ── MediaSource + SourceBuffer ──────────────────────────────────────────
     let mediaSource = null;
     let sourceBuffer = null;
     let wsUrl = null;
     let ws = null;
-    let queue = [];           // segment queue while sourceBuffer is busy
-    let initReceived = false;
-    let mimeType = 'video/mp4; codecs="avc1.64001f"'; // H264 High
+    let queue = [];
+    let mimeType = 'video/mp4; codecs="avc1.64001f"';
 
+    // MSE Setup
     function initMSE() {
       mediaSource = new MediaSource();
       video.src = URL.createObjectURL(mediaSource);
-
       mediaSource.addEventListener('sourceopen', () => {
         status.textContent = 'MSE ready, connecting...';
         try {
           sourceBuffer = mediaSource.addSourceBuffer(mimeType);
-          sourceBuffer.mode = 'sequence';  // Accept segments in order, no timestamp issues
+          sourceBuffer.mode = 'sequence';
           sourceBuffer.addEventListener('updateend', flushQueue);
           if (wsUrl) connectWebSocket(wsUrl);
         } catch (e) {
@@ -58,14 +52,10 @@
     }
 
     function flushQueue() {
-      if (queue.length > 0 && !sourceBuffer.updating) {
+      if (queue.length > 0 && sourceBuffer && !sourceBuffer.updating) {
         const next = queue.shift();
-        try {
-          sourceBuffer.appendBuffer(next);
-        } catch (e) {
-          console.warn('appendBuffer error:', e);
-          queue = []; // clear queue on error
-        }
+        try { sourceBuffer.appendBuffer(next); }
+        catch (e) { console.warn('appendBuffer error:', e); queue = []; }
       }
     }
 
@@ -74,14 +64,9 @@
       if (sourceBuffer.updating) {
         queue.push(data);
       } else {
-        try {
-          sourceBuffer.appendBuffer(data);
-        } catch (e) {
-          console.warn('appendBuffer error:', e);
-        }
+        try { sourceBuffer.appendBuffer(data); }
+        catch (e) { console.warn('appendBuffer error:', e); }
       }
-
-      // Trim buffer to prevent memory bloat (keep only last 10 seconds)
       trimBuffer();
     }
 
@@ -92,35 +77,47 @@
         const end = buffered.end(buffered.length - 1);
         const start = buffered.start(0);
         if (end - start > 10) {
-          try {
-            sourceBuffer.remove(start, end - 5);
-          } catch (e) {}
+          try { sourceBuffer.remove(start, end - 5); } catch (e) {}
         }
       }
     }
 
-    // ── WebSocket ──────────────────────────────────────────────────────────
+    // WebSocket
     function connectWebSocket(url) {
       wsUrl = url;
-      status.textContent = 'Connecting to ' + url;
+      status.textContent = 'Connecting...';
       console.log('WS connecting to:', url);
 
       ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        status.textContent = 'Connected ✓';
+        status.textContent = 'Connected';
         console.log('WS connected');
       };
+
+      let segmentCount = 0;
 
       ws.onmessage = (event) => {
         const data = new Uint8Array(event.data);
         appendSegment(data);
+        segmentCount++;
 
-        // Auto-play as soon as we have enough data
-        if (video.paused && video.readyState >= 2) {
+        // Start playback after init + first media segment
+        if (segmentCount === 2) {
           video.play().catch(() => {});
           status.textContent = '';
+        }
+
+        // Jump to live edge every 3 segments to prevent drift
+        if (segmentCount % 3 === 0) {
+          const buffered = video.buffered;
+          if (buffered.length > 0) {
+            const liveEdge = buffered.end(buffered.length - 1);
+            if (liveEdge - video.currentTime > 0.8) {
+              video.currentTime = liveEdge - 0.1;
+            }
+          }
         }
       };
 
@@ -132,32 +129,25 @@
       ws.onclose = () => {
         console.log('WS closed, reconnecting in 1s...');
         status.textContent = 'Reconnecting...';
-        setTimeout(() => {
-          if (wsUrl) connectWebSocket(wsUrl);
-        }, 1000);
+        setTimeout(() => { if (wsUrl) connectWebSocket(wsUrl); }, 1000);
       };
     }
 
-    // ── Cast SDK Integration ───────────────────────────────────────────────
+    // Cast SDK
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
 
-    // Intercept LOAD requests — extract ws:// URL and handle ourselves
     pm.setMessageInterceptor(
       cast.framework.messages.MessageType.LOAD,
       (request) => {
         const url = (request.media && request.media.contentUrl) || '';
         console.log('LOAD intercepted, URL:', url);
-
         if (url.startsWith('ws://') || url.startsWith('wss://')) {
-          // Handle WebSocket stream ourselves
           status.textContent = 'Initializing...';
-          initMSE();        // sets up MediaSource
-          wsUrl = url;      // connectWebSocket called after sourceopen
-          return null;      // tell Cast SDK we're handling this ourselves
+          initMSE();
+          wsUrl = url;
+          return null;
         }
-
-        // Fall through for other media types
         return request;
       }
     );
