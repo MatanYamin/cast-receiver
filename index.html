@@ -1,30 +1,169 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <meta charset="utf-8">
+  <title>ScreenMirror Receiver</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+    video {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+    #status {
+      position: absolute; top: 20px; left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.6);
+      font-family: sans-serif; font-size: 18px;
+      pointer-events: none;
+    }
+  </style>
 </head>
-<body style="margin:0;background:#000;">
-  <video id="vid" style="width:100%;height:100vh;" autoplay playsinline></video>
-<script>
+<body>
+  <video id="vid" autoplay playsinline muted></video>
+  <div id="status">Waiting for stream...</div>
+
+  <!-- Cast Receiver SDK -->
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+
+  <script>
+    const video = document.getElementById('vid');
+    const status = document.getElementById('status');
+
+    // ── MediaSource + SourceBuffer ──────────────────────────────────────────
+    let mediaSource = null;
+    let sourceBuffer = null;
+    let wsUrl = null;
+    let ws = null;
+    let queue = [];           // segment queue while sourceBuffer is busy
+    let initReceived = false;
+    let mimeType = 'video/mp4; codecs="avc1.64001f"'; // H264 High
+
+    function initMSE() {
+      mediaSource = new MediaSource();
+      video.src = URL.createObjectURL(mediaSource);
+
+      mediaSource.addEventListener('sourceopen', () => {
+        status.textContent = 'MSE ready, connecting...';
+        try {
+          sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+          sourceBuffer.mode = 'sequence';  // Accept segments in order, no timestamp issues
+          sourceBuffer.addEventListener('updateend', flushQueue);
+          if (wsUrl) connectWebSocket(wsUrl);
+        } catch (e) {
+          status.textContent = 'MSE error: ' + e.message;
+          console.error('MSE addSourceBuffer failed:', e);
+        }
+      });
+    }
+
+    function flushQueue() {
+      if (queue.length > 0 && !sourceBuffer.updating) {
+        const next = queue.shift();
+        try {
+          sourceBuffer.appendBuffer(next);
+        } catch (e) {
+          console.warn('appendBuffer error:', e);
+          queue = []; // clear queue on error
+        }
+      }
+    }
+
+    function appendSegment(data) {
+      if (!sourceBuffer) return;
+      if (sourceBuffer.updating) {
+        queue.push(data);
+      } else {
+        try {
+          sourceBuffer.appendBuffer(data);
+        } catch (e) {
+          console.warn('appendBuffer error:', e);
+        }
+      }
+
+      // Trim buffer to prevent memory bloat (keep only last 10 seconds)
+      trimBuffer();
+    }
+
+    function trimBuffer() {
+      if (!sourceBuffer || sourceBuffer.updating) return;
+      const buffered = sourceBuffer.buffered;
+      if (buffered.length > 0) {
+        const end = buffered.end(buffered.length - 1);
+        const start = buffered.start(0);
+        if (end - start > 10) {
+          try {
+            sourceBuffer.remove(start, end - 5);
+          } catch (e) {}
+        }
+      }
+    }
+
+    // ── WebSocket ──────────────────────────────────────────────────────────
+    function connectWebSocket(url) {
+      wsUrl = url;
+      status.textContent = 'Connecting to ' + url;
+      console.log('WS connecting to:', url);
+
+      ws = new WebSocket(url);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        status.textContent = 'Connected ✓';
+        console.log('WS connected');
+      };
+
+      ws.onmessage = (event) => {
+        const data = new Uint8Array(event.data);
+        appendSegment(data);
+
+        // Auto-play as soon as we have enough data
+        if (video.paused && video.readyState >= 2) {
+          video.play().catch(() => {});
+          status.textContent = '';
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.error('WS error:', e);
+        status.textContent = 'Connection error';
+      };
+
+      ws.onclose = () => {
+        console.log('WS closed, reconnecting in 1s...');
+        status.textContent = 'Reconnecting...';
+        setTimeout(() => {
+          if (wsUrl) connectWebSocket(wsUrl);
+        }, 1000);
+      };
+    }
+
+    // ── Cast SDK Integration ───────────────────────────────────────────────
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
-    pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, req => {
-      const url = req.media.contentUrl || req.media.contentId;
-      const video = document.getElementById('vid');
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-            liveSyncDurationCount: 2,
-            liveMaxLatencyDurationCount: 3,
-            maxBufferLength: 1,
-            lowLatencyMode: false,
-        });
-        hls.loadSource(url);
-        hls.attachMedia(video);
+
+    // Intercept LOAD requests — extract ws:// URL and handle ourselves
+    pm.setMessageInterceptor(
+      cast.framework.messages.MessageType.LOAD,
+      (request) => {
+        const url = (request.media && request.media.contentUrl) || '';
+        console.log('LOAD intercepted, URL:', url);
+
+        if (url.startsWith('ws://') || url.startsWith('wss://')) {
+          // Handle WebSocket stream ourselves
+          status.textContent = 'Initializing...';
+          initMSE();        // sets up MediaSource
+          wsUrl = url;      // connectWebSocket called after sourceopen
+          return null;      // tell Cast SDK we're handling this ourselves
+        }
+
+        // Fall through for other media types
+        return request;
       }
-      return null;
-    });
-    ctx.start();
-</script>
+    );
+
+    ctx.start({ maxInactivity: 3600 });
+    console.log('Cast receiver started');
+  </script>
 </body>
 </html>
