@@ -6,24 +6,25 @@
 </head>
 <body style="margin:0;background:#000;">
   <video id="vid" style="width:100%;height:100vh;" autoplay playsinline></video>
-  <script>
+<script>
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, req => {
       const url = req.media.contentUrl || req.media.contentId;
-      console.log('Loading URL:', url);
       const video = document.getElementById('vid');
       if (Hls.isSupported()) {
-        const hls = new Hls({ debug: true });
+        const hls = new Hls({
+          liveSyncDurationCount: 1,     // only 1 segment behind live
+          liveMaxLatencyDurationCount: 2,
+          maxBufferLength: 1,
+          maxMaxBufferLength: 2,
+        });
         hls.loadSource(url);
         hls.attachMedia(video);
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error('HLS error:', data);
-        });
       }
-      return null; // Return null to prevent default handling
+      return null;
     });
     ctx.start();
-  </script>
+</script>
 </body>
 </html>
