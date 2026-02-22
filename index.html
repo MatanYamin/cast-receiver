@@ -6,40 +6,56 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
-    canvas { width: 100%; height: 100%; object-fit: contain; }
+    #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
+    #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
+    #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
     #status {
-      position: absolute; top: 20px; left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255,255,255,0.7);
-      font-family: sans-serif; font-size: 18px;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(255,255,255,0.5);
+      font-family: sans-serif; font-size: 20px;
       pointer-events: none;
     }
   </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
-  <div id="status">Waiting for stream...</div>
+  <canvas id="canvas"></canvas>
+  <video  id="video" autoplay playsinline></video>
+  <img    id="image" />
+  <div    id="status">Ready</div>
 
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-
   <script>
-    const canvas = document.getElementById('c');
-    const ctx2d  = canvas.getContext('2d');
-    const status = document.getElementById('status');
+    const canvas  = document.getElementById('canvas');
+    const ctx2d   = canvas.getContext('2d');
+    const video   = document.getElementById('video');
+    const image   = document.getElementById('image');
+    const status  = document.getElementById('status');
 
     let wsUrl = null;
     let ws    = null;
     let frameCount = 0;
     let lastFrameTime = 0;
 
-    // Resize canvas to screen
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
 
-    // ── WebSocket ────────────────────────────────────────────────────────────
+    function showOnly(el) {
+      canvas.style.display = 'none';
+      video.style.display  = 'none';
+      image.style.display  = 'none';
+      status.style.display = 'none';
+      el.style.display     = 'block';
+    }
+
+    // ── WebSocket mirror mode ────────────────────────────────────────────────
     function connectWebSocket(url) {
       wsUrl = url;
+      console.log('WS connecting to:', url);
+      showOnly(canvas);
+      status.style.display = 'block';
       status.textContent = 'Connecting...';
+
       ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
 
@@ -49,7 +65,6 @@
       };
 
       ws.onmessage = (event) => {
-        // Each message is a JPEG frame
         const blob = new Blob([event.data], { type: 'image/jpeg' });
         const url  = URL.createObjectURL(blob);
         const img  = new Image();
@@ -60,8 +75,8 @@
           URL.revokeObjectURL(url);
           frameCount++;
           const now = performance.now();
-          if (frameCount % 30 === 0) {
-            const fps = Math.round(30000 / (now - lastFrameTime));
+          if (frameCount % 60 === 0) {
+            const fps = Math.round(60000 / (now - lastFrameTime));
             status.textContent = fps + ' fps';
             lastFrameTime = now;
           }
@@ -69,15 +84,27 @@
         img.src = url;
       };
 
-      ws.onerror = (e) => {
-        console.error('WS error', e);
-        status.textContent = 'Error';
-      };
-
-      ws.onclose = () => {
-        status.textContent = 'Reconnecting...';
+      ws.onerror  = (e) => { console.error('WS error', e); };
+      ws.onclose  = () => {
+        console.log('WS closed, reconnecting...');
         setTimeout(() => { if (wsUrl) connectWebSocket(wsUrl); }, 500);
       };
+    }
+
+    // ── Image display ────────────────────────────────────────────────────────
+    function displayImage(url) {
+      console.log('Displaying image:', url);
+      showOnly(image);
+      image.src = url;
+      image.onerror = () => console.error('Image load error:', url);
+    }
+
+    // ── Video playback ───────────────────────────────────────────────────────
+    function playVideo(url) {
+      console.log('Playing video:', url);
+      showOnly(video);
+      video.src = url;
+      video.play().catch(e => console.error('Video play error:', e));
     }
 
     // ── Cast SDK ─────────────────────────────────────────────────────────────
@@ -87,13 +114,29 @@
     pm.setMessageInterceptor(
       cast.framework.messages.MessageType.LOAD,
       (request) => {
-        const url = (request.media && request.media.contentUrl) || '';
-        console.log('LOAD:', url);
+        const url         = (request.media && request.media.contentUrl) || '';
+        const contentType = (request.media && request.media.contentType) || '';
+        console.log('LOAD request — url:', url, 'type:', contentType);
+
         if (url.startsWith('ws://') || url.startsWith('wss://')) {
+          // Mirror mode
           connectWebSocket(url);
-          return null; // handle ourselves
+          return null; // handle ourselves, skip CAF
+
+        } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
+          // Image mode
+          displayImage(url);
+          return null;
+
+        } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
+          // Video mode — let CAF handle it (it has controls built in)
+          showOnly(video);
+          return request;
+
+        } else {
+          // Unknown — pass to CAF
+          return request;
         }
-        return request;
       }
     );
 
