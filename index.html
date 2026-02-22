@@ -5,32 +5,101 @@
   <title>ScreenMirror Receiver</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; font-family: sans-serif; }
+
     #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
     #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
     #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
-    #status {
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      color: rgba(255,255,255,0.5);
-      font-family: sans-serif; font-size: 20px;
-      pointer-events: none;
+
+    /* ── Idle / connecting screen ── */
+    #idle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(ellipse at center, #111 0%, #000 70%);
     }
+
+    #idle img.logo {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      border-radius: 32px;
+      margin-bottom: 32px;
+      opacity: 0.95;
+    }
+
+    #idle h1 {
+      font-size: 52px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+    }
+
+    #idle p {
+      font-size: 24px;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 48px;
+    }
+
+    /* connecting pill shown while waiting for stream */
+    #connecting {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 100px;
+      padding: 12px 24px;
+    }
+
+    #connecting.visible { display: flex; }
+
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: rgba(255,255,255,0.7);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    #connecting span {
+      font-size: 18px;
+      color: rgba(255,255,255,0.55);
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <!-- Idle/connecting splash -->
+  <div id="idle">
+    <!-- Replace this src with your actual logo URL on GitHub Pages e.g. ./logo.png -->
+    <img class="logo" src="./logo.png" onerror="this.style.display='none'" />
+    <h1>Mirror &amp; Casting</h1>
+    <p>Open the app on your phone to get started</p>
+    <div id="connecting">
+      <div class="spinner"></div>
+      <span id="connecting-text">Connecting…</span>
+    </div>
+  </div>
+
   <canvas id="canvas"></canvas>
   <video  id="video" autoplay playsinline></video>
   <img    id="image" />
-  <div    id="status">Ready</div>
 
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <script>
-    const canvas  = document.getElementById('canvas');
-    const ctx2d   = canvas.getContext('2d');
-    const video   = document.getElementById('video');
-    const image   = document.getElementById('image');
-    const status  = document.getElementById('status');
+    const canvas   = document.getElementById('canvas');
+    const ctx2d    = canvas.getContext('2d');
+    const video    = document.getElementById('video');
+    const image    = document.getElementById('image');
+    const idle     = document.getElementById('idle');
+    const connecting = document.getElementById('connecting');
+    const connectingText = document.getElementById('connecting-text');
 
     let wsUrl = null;
     let ws    = null;
@@ -40,64 +109,68 @@
     canvas.height = window.screen.height || 1080;
 
     function showOnly(el) {
+      idle.style.display   = 'none';
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
-      status.style.display = 'none';
       el.style.display     = 'block';
+    }
+
+    function showIdle(msg) {
+      idle.style.display = 'flex';
+      canvas.style.display = 'none';
+      video.style.display  = 'none';
+      image.style.display  = 'none';
+      if (msg) {
+        connecting.classList.add('visible');
+        connectingText.textContent = msg;
+      } else {
+        connecting.classList.remove('visible');
+      }
     }
 
     // ── WebSocket mirror mode ────────────────────────────────────────────────
     function connectWebSocket(url) {
       wsUrl = url;
-      console.log('WS connecting to:', url);
-      showOnly(canvas);
-      status.style.display = 'block';
-      status.textContent = 'Connecting...';
+      showIdle('Connecting to your phone…');
 
       ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        status.textContent = '';
         console.log('WS connected');
+        // Hide idle as soon as first frame arrives, not on open
       };
 
       ws.onmessage = (event) => {
+        // First frame — switch to canvas
+        if (idle.style.display !== 'none') { showOnly(canvas); }
         const blob = new Blob([event.data], { type: 'image/jpeg' });
-        const url  = URL.createObjectURL(blob);
+        const burl = URL.createObjectURL(blob);
         const img  = new Image();
         img.onload = () => {
           canvas.width  = img.width;
           canvas.height = img.height;
           ctx2d.drawImage(img, 0, 0);
-          URL.revokeObjectURL(url);
+          URL.revokeObjectURL(burl);
           frameCount++;
         };
-        img.src = url;
+        img.src = burl;
       };
 
       ws.onerror  = (e) => { console.error('WS error', e); };
       ws.onclose  = () => {
-        console.log('WS closed, reconnecting...');
-        setTimeout(() => { if (wsUrl) connectWebSocket(wsUrl); }, 500);
+        console.log('WS closed');
+        showIdle('Connection lost — reconnecting…');
+        setTimeout(() => { if (wsUrl) connectWebSocket(wsUrl); }, 1000);
       };
     }
 
     // ── Image display ────────────────────────────────────────────────────────
     function displayImage(url) {
-      console.log('Displaying image:', url);
       showOnly(image);
       image.src = url;
       image.onerror = () => console.error('Image load error:', url);
-    }
-
-    // ── Video playback ───────────────────────────────────────────────────────
-    function playVideo(url) {
-      console.log('Playing video:', url);
-      showOnly(video);
-      video.src = url;
-      video.play().catch(e => console.error('Video play error:', e));
     }
 
     // ── Cast SDK ─────────────────────────────────────────────────────────────
@@ -109,28 +182,27 @@
       (request) => {
         const url         = (request.media && request.media.contentUrl) || '';
         const contentType = (request.media && request.media.contentType) || '';
-        console.log('LOAD request — url:', url, 'type:', contentType);
+        console.log('LOAD — url:', url, 'type:', contentType);
 
         if (url.startsWith('ws://') || url.startsWith('wss://')) {
-          // Mirror mode
           connectWebSocket(url);
-          return null; // handle ourselves, skip CAF
-
+          return null;
         } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
-          // Image mode
           displayImage(url);
           return null;
-
         } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
-          // Video mode — let CAF handle it (it has controls built in)
           showOnly(video);
           return request;
-
         } else {
-          // Unknown — pass to CAF
           return request;
         }
       }
+    );
+
+    // Return to idle splash when session ends
+    castCtx.addEventListener(
+      cast.framework.system.EventType.SHUTDOWN,
+      () => showIdle(null)
     );
 
     castCtx.start({ maxInactivity: 3600 });
