@@ -2,16 +2,28 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ScreenMirror Receiver</title>
+  <title>Mirror & Casting</title>
   <style>
+    @font-face {
+      font-family: 'Croogla';
+      src: url('./Croogla4F.ttf') format('truetype');
+      font-weight: normal;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; font-family: sans-serif; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      font-family: 'Croogla', sans-serif;
+    }
 
     #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
     #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
     #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
 
-    /* ── Idle / connecting screen ── */
+    /* ── Idle splash ── */
     #idle {
       display: flex;
       flex-direction: column;
@@ -19,72 +31,127 @@
       justify-content: center;
       width: 100vw;
       height: 100vh;
-      background: radial-gradient(ellipse at center, #111 0%, #000 70%);
+      /* Rich dark gradient — deep navy/purple tones */
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(30, 20, 60, 0.9) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 80%, rgba(0, 40, 60, 0.7) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 50%, rgba(10, 10, 25, 1) 0%, rgba(0,0,0,1) 100%);
+      position: relative;
     }
 
+    /* Subtle grid overlay for depth */
+    #idle::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .idle-inner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Logo */
     #idle img.logo {
-      width: 160px;
-      height: 160px;
+      width: 220px;
       object-fit: contain;
-      border-radius: 32px;
-      margin-bottom: 32px;
-      opacity: 0.95;
+      margin-bottom: 8px;
+      /* No border-radius since logo has its own black bg */
+      filter: drop-shadow(0 0 30px rgba(0, 220, 200, 0.25));
+    }
+
+    /* Divider line */
+    .divider {
+      width: 1px;
+      height: 40px;
+      background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent);
+      margin: 20px 0;
     }
 
     #idle h1 {
-      font-size: 52px;
-      font-weight: 700;
+      font-family: 'Croogla', sans-serif;
+      font-size: 56px;
+      font-weight: 800;
       color: #fff;
-      letter-spacing: -1px;
+      letter-spacing: -1.5px;
       margin-bottom: 12px;
+      /* Subtle gradient on text */
+      background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     #idle p {
-      font-size: 24px;
-      color: rgba(255,255,255,0.35);
-      margin-bottom: 48px;
+      font-size: 22px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.28);
+      margin-bottom: 52px;
+      letter-spacing: 0.2px;
     }
 
-    /* connecting pill shown while waiting for stream */
+    /* Connecting pill */
     #connecting {
       display: none;
       align-items: center;
-      gap: 12px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
+      gap: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
       border-radius: 100px;
-      padding: 12px 24px;
+      padding: 14px 28px;
+      backdrop-filter: blur(10px);
     }
-
     #connecting.visible { display: flex; }
 
     .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid rgba(255,255,255,0.15);
-      border-top-color: rgba(255,255,255,0.7);
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.12);
+      border-top-color: rgba(0, 220, 200, 0.8);
       border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      animation: spin 0.75s linear infinite;
+      flex-shrink: 0;
     }
 
     #connecting span {
       font-size: 18px;
-      color: rgba(255,255,255,0.55);
+      font-weight: 600;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.2px;
+    }
+
+    /* Bottom watermark */
+    .watermark {
+      position: absolute;
+      bottom: 32px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.1);
+      letter-spacing: 1px;
+      text-transform: uppercase;
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <!-- Idle/connecting splash -->
   <div id="idle">
-    <!-- Replace this src with your actual logo URL on GitHub Pages e.g. ./logo.png -->
-    <img class="logo" src="./logo.png" onerror="this.style.display='none'" />
-    <h1>Mirror &amp; Casting</h1>
-    <p>Open the app on your phone to get started</p>
-    <div id="connecting">
-      <div class="spinner"></div>
-      <span id="connecting-text">Connecting…</span>
+    <div class="idle-inner">
+      <img class="logo" src="./logo.png" onerror="this.style.display='none'" />
+      <div class="divider"></div>
+      <h1>Mirror &amp; Casting</h1>
+      <p>Open the app on your phone to get started</p>
+      <div id="connecting">
+        <div class="spinner"></div>
+        <span id="connecting-text">Connecting…</span>
+      </div>
     </div>
+    <div class="watermark">myapps.co</div>
   </div>
 
   <canvas id="canvas"></canvas>
@@ -93,17 +160,16 @@
 
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <script>
-    const canvas   = document.getElementById('canvas');
-    const ctx2d    = canvas.getContext('2d');
-    const video    = document.getElementById('video');
-    const image    = document.getElementById('image');
-    const idle     = document.getElementById('idle');
-    const connecting = document.getElementById('connecting');
+    const canvas         = document.getElementById('canvas');
+    const ctx2d          = canvas.getContext('2d');
+    const video          = document.getElementById('video');
+    const image          = document.getElementById('image');
+    const idle           = document.getElementById('idle');
+    const connecting     = document.getElementById('connecting');
     const connectingText = document.getElementById('connecting-text');
 
     let wsUrl = null;
     let ws    = null;
-    let frameCount = 0;
 
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
@@ -117,7 +183,7 @@
     }
 
     function showIdle(msg) {
-      idle.style.display = 'flex';
+      idle.style.display   = 'flex';
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
@@ -129,22 +195,15 @@
       }
     }
 
-    // ── WebSocket mirror mode ────────────────────────────────────────────────
+    // ── WebSocket mirror ─────────────────────────────────────────────────────
     function connectWebSocket(url) {
       wsUrl = url;
       showIdle('Connecting to your phone…');
-
       ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
-
-      ws.onopen = () => {
-        console.log('WS connected');
-        // Hide idle as soon as first frame arrives, not on open
-      };
-
+      ws.onopen = () => console.log('WS connected');
       ws.onmessage = (event) => {
-        // First frame — switch to canvas
-        if (idle.style.display !== 'none') { showOnly(canvas); }
+        if (idle.style.display !== 'none') showOnly(canvas);
         const blob = new Blob([event.data], { type: 'image/jpeg' });
         const burl = URL.createObjectURL(blob);
         const img  = new Image();
@@ -153,58 +212,44 @@
           canvas.height = img.height;
           ctx2d.drawImage(img, 0, 0);
           URL.revokeObjectURL(burl);
-          frameCount++;
         };
         img.src = burl;
       };
-
-      ws.onerror  = (e) => { console.error('WS error', e); };
-      ws.onclose  = () => {
-        console.log('WS closed');
+      ws.onerror = (e) => console.error('WS error', e);
+      ws.onclose = () => {
         showIdle('Connection lost — reconnecting…');
         setTimeout(() => { if (wsUrl) connectWebSocket(wsUrl); }, 1000);
       };
     }
 
-    // ── Image display ────────────────────────────────────────────────────────
+    // ── Image ────────────────────────────────────────────────────────────────
     function displayImage(url) {
       showOnly(image);
       image.src = url;
-      image.onerror = () => console.error('Image load error:', url);
     }
 
     // ── Cast SDK ─────────────────────────────────────────────────────────────
     const castCtx = cast.framework.CastReceiverContext.getInstance();
     const pm = castCtx.getPlayerManager();
 
-    pm.setMessageInterceptor(
-      cast.framework.messages.MessageType.LOAD,
-      (request) => {
-        const url         = (request.media && request.media.contentUrl) || '';
-        const contentType = (request.media && request.media.contentType) || '';
-        console.log('LOAD — url:', url, 'type:', contentType);
+    pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {
+      const url         = (request.media && request.media.contentUrl) || '';
+      const contentType = (request.media && request.media.contentType) || '';
 
-        if (url.startsWith('ws://') || url.startsWith('wss://')) {
-          connectWebSocket(url);
-          return null;
-        } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
-          displayImage(url);
-          return null;
-        } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
-          showOnly(video);
-          return request;
-        } else {
-          return request;
-        }
+      if (url.startsWith('ws://') || url.startsWith('wss://')) {
+        connectWebSocket(url);
+        return null;
+      } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
+        displayImage(url);
+        return null;
+      } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
+        showOnly(video);
+        return request;
       }
-    );
+      return request;
+    });
 
-    // Return to idle splash when session ends
-    castCtx.addEventListener(
-      cast.framework.system.EventType.SHUTDOWN,
-      () => showIdle(null)
-    );
-
+    castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => showIdle(null));
     castCtx.start({ maxInactivity: 3600 });
   </script>
 </body>
