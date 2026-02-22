@@ -35,7 +35,6 @@
     let wsUrl = null;
     let ws    = null;
     let frameCount = 0;
-    let lastFrameTime = 0;
 
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
@@ -74,12 +73,6 @@
           ctx2d.drawImage(img, 0, 0);
           URL.revokeObjectURL(url);
           frameCount++;
-          const now = performance.now();
-          if (frameCount % 60 === 0) {
-            const fps = Math.round(60000 / (now - lastFrameTime));
-            status.textContent = fps + ' fps';
-            lastFrameTime = now;
-          }
         };
         img.src = url;
       };
