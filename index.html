@@ -31,27 +31,53 @@
       justify-content: center;
       width: 100vw;
       height: 100vh;
-      /* Rich dark gradient — deep navy/purple tones */
-      background:
-        radial-gradient(ellipse at 30% 20%, rgba(30, 20, 60, 0.9) 0%, transparent 60%),
-        radial-gradient(ellipse at 70% 80%, rgba(0, 40, 60, 0.7) 0%, transparent 55%),
-        radial-gradient(ellipse at 50% 50%, rgba(10, 10, 25, 1) 0%, rgba(0,0,0,1) 100%);
+      background: #000;
       position: relative;
     }
 
-    /* Subtle grid overlay for depth */
+    /* Dark grey radial gradient */
+    #idle::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 45%, rgba(60,60,60,0.45) 0%, rgba(0,0,0,0) 65%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Subtle diagonal stripes on top */
     #idle::before {
       content: '';
       position: absolute;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 60px 60px;
+      background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 24px,
+        rgba(255,255,255,0.022) 24px,
+        rgba(255,255,255,0.022) 25px
+      );
       pointer-events: none;
+      z-index: 0;
     }
 
-    .idle-inner {
+    .glow {
+      position: absolute;
+      width: 600px;
+      height: 400px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -55%);
+      background: radial-gradient(ellipse, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 40%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(30px);
+    }
+
+        .idle-inner {
+      position: relative;
+      z-index: 1;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -142,16 +168,17 @@
 <body>
   <div id="idle">
     <div class="idle-inner">
+      <div class="glow"></div>
       <img class="logo" src="./logo.png" onerror="this.style.display='none'" />
       <div class="divider"></div>
       <h1>Mirror &amp; Casting</h1>
-      <p>Open the app on your phone to get started</p>
+      <p>Your screen, on the big screen</p>
       <div id="connecting">
         <div class="spinner"></div>
         <span id="connecting-text">Connecting…</span>
       </div>
     </div>
-    <div class="watermark">myapps.co</div>
+
   </div>
 
   <canvas id="canvas"></canvas>
