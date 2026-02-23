@@ -4,11 +4,6 @@
   <meta charset="utf-8">
   <title>Mirror & Casting</title>
   <style>
-    @font-face {
-      font-family: 'Croogla';
-      src: url('./Croogla4F.ttf') format('truetype');
-      font-weight: normal;
-    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
@@ -16,169 +11,44 @@
       overflow: hidden;
       width: 100vw;
       height: 100vh;
-      font-family: 'Croogla', sans-serif;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
     }
 
     #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
     #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
     #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
 
-    /* ── Idle splash ── */
     #idle {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 10px;
       width: 100vw;
       height: 100vh;
       background: #000;
-      position: relative;
     }
 
-    /* Dark grey radial gradient */
-    #idle::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at 50% 45%, rgba(60,60,60,0.45) 0%, rgba(0,0,0,0) 65%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Subtle diagonal stripes on top */
-    #idle::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: repeating-linear-gradient(
-        -45deg,
-        transparent,
-        transparent 24px,
-        rgba(255,255,255,0.022) 24px,
-        rgba(255,255,255,0.022) 25px
-      );
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .glow {
-      position: absolute;
-      width: 600px;
-      height: 400px;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -55%);
-      background: radial-gradient(ellipse, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 40%, transparent 70%);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 0;
-      filter: blur(30px);
-    }
-
-        .idle-inner {
-      position: relative;
-      z-index: 1;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    /* Logo */
     #idle img.logo {
-      width: 220px;
+      width: 36px;
+      height: 36px;
       object-fit: contain;
-      margin-bottom: 8px;
-      /* No border-radius since logo has its own black bg */
-      filter: drop-shadow(0 0 30px rgba(0, 220, 200, 0.25));
-    }
-
-    /* Divider line */
-    .divider {
-      width: 1px;
-      height: 40px;
-      background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent);
-      margin: 20px 0;
-    }
-
-    #idle h1 {
-      font-family: 'Croogla', sans-serif;
-      font-size: 56px;
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -1.5px;
-      margin-bottom: 12px;
-      /* Subtle gradient on text */
-      background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      border-radius: 8px;
+      opacity: 0.7;
     }
 
     #idle p {
-      font-size: 22px;
+      font-size: 13px;
       font-weight: 400;
-      color: rgba(255,255,255,0.28);
-      margin-bottom: 52px;
+      color: rgba(255,255,255,0.3);
       letter-spacing: 0.2px;
     }
-
-    /* Connecting pill */
-    #connecting {
-      display: none;
-      align-items: center;
-      gap: 14px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 100px;
-      padding: 14px 28px;
-      backdrop-filter: blur(10px);
-    }
-    #connecting.visible { display: flex; }
-
-    .spinner {
-      width: 18px; height: 18px;
-      border: 2px solid rgba(255,255,255,0.12);
-      border-top-color: rgba(0, 220, 200, 0.8);
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-      flex-shrink: 0;
-    }
-
-    #connecting span {
-      font-size: 18px;
-      font-weight: 600;
-      color: rgba(255,255,255,0.45);
-      letter-spacing: 0.2px;
-    }
-
-    /* Bottom watermark */
-    .watermark {
-      position: absolute;
-      bottom: 32px;
-      font-size: 14px;
-      color: rgba(255,255,255,0.1);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div id="idle">
-    <div class="idle-inner">
-      <div class="glow"></div>
-      <img class="logo" src="./logo.png" onerror="this.style.display='none'" />
-      <div class="divider"></div>
-      <h1>Mirror &amp; Casting</h1>
-      <p>Your screen, on the big screen</p>
-      <div id="connecting">
-        <div class="spinner"></div>
-        <span id="connecting-text">Connecting…</span>
-      </div>
-    </div>
-
+    <img class="logo" src="./logo.png" onerror="this.style.display='none'" />
+    <p>Ready to mirror</p>
   </div>
 
   <canvas id="canvas"></canvas>
@@ -192,14 +62,26 @@
     const video          = document.getElementById('video');
     const image          = document.getElementById('image');
     const idle           = document.getElementById('idle');
-    const connecting     = document.getElementById('connecting');
-    const connectingText = document.getElementById('connecting-text');
 
-    let wsUrl = null;
-    let ws    = null;
+    let wsUrl        = null;
+    let ws           = null;
+    let wsConnecting = false;  // guard against duplicate connections
+    let reconnectTimer = null;
 
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
+
+    // Reuse a single Image object to avoid GC pressure at 30fps
+    const frameImg = new Image();
+    let   pendingBurl = null;
+    frameImg.onload = () => {
+      if (canvas.width !== frameImg.width || canvas.height !== frameImg.height) {
+        canvas.width  = frameImg.width;
+        canvas.height = frameImg.height;
+      }
+      ctx2d.drawImage(frameImg, 0, 0);
+      if (pendingBurl) { URL.revokeObjectURL(pendingBurl); pendingBurl = null; }
+    };
 
     function showOnly(el) {
       idle.style.display   = 'none';
@@ -209,43 +91,61 @@
       el.style.display     = 'block';
     }
 
-    function showIdle(msg) {
+    function showIdle() {
       idle.style.display   = 'flex';
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
-      if (msg) {
-        connecting.classList.add('visible');
-        connectingText.textContent = msg;
-      } else {
-        connecting.classList.remove('visible');
-      }
     }
 
     // ── WebSocket mirror ─────────────────────────────────────────────────────
     function connectWebSocket(url) {
+      // Cancel any pending reconnect
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+      // Close existing socket cleanly before opening a new one
+      if (ws) {
+        ws.onclose = null;  // prevent onclose from triggering another reconnect
+        ws.onerror = null;
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+        ws = null;
+      }
+
       wsUrl = url;
-      showIdle('Connecting to your phone…');
-      ws = new WebSocket(url);
+      wsConnecting = true;
+      showIdle();
+
+      const newWs = new WebSocket(url);
+      ws = newWs;
       ws.binaryType = 'arraybuffer';
-      ws.onopen = () => console.log('WS connected');
+
+      ws.onopen = () => {
+        wsConnecting = false;
+        console.log('WS connected');
+        showOnly(canvas);
+      };
+
       ws.onmessage = (event) => {
         if (idle.style.display !== 'none') showOnly(canvas);
-        const blob = new Blob([event.data], { type: 'image/jpeg' });
-        const burl = URL.createObjectURL(blob);
-        const img  = new Image();
-        img.onload = () => {
-          canvas.width  = img.width;
-          canvas.height = img.height;
-          ctx2d.drawImage(img, 0, 0);
-          URL.revokeObjectURL(burl);
-        };
-        img.src = burl;
+        // Revoke previous URL if still pending
+        if (pendingBurl) { URL.revokeObjectURL(pendingBurl); }
+        const blob  = new Blob([event.data], { type: 'image/jpeg' });
+        pendingBurl = URL.createObjectURL(blob);
+        frameImg.src = pendingBurl;
       };
+
       ws.onerror = (e) => console.error('WS error', e);
+
       ws.onclose = () => {
-        showIdle('Connection lost — reconnecting…');
-        setTimeout(() => { if (wsUrl) connectWebSocket(wsUrl); }, 1000);
+        if (ws !== newWs) return;  // stale socket, ignore
+        wsConnecting = false;
+        showIdle();
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (wsUrl) connectWebSocket(wsUrl);
+        }, 1500);
       };
     }
 
@@ -276,7 +176,7 @@
       return request;
     });
 
-    castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => showIdle(null));
+    castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => showIdle());
     castCtx.start({ maxInactivity: 3600 });
   </script>
 </body>
