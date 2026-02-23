@@ -128,8 +128,8 @@
       };
 
       ws.onmessage = (event) => {
-        // Switch to canvas on first frame arrival, not on open
-        if (canvas.style.display === 'none') showOnly(canvas);
+        // Switch to canvas on first frame arrival (check computed style, not inline)
+        if (getComputedStyle(canvas).display === 'none') showOnly(canvas);
         // Revoke previous URL if still pending
         if (pendingBurl) { URL.revokeObjectURL(pendingBurl); }
         const blob  = new Blob([event.data], { type: 'image/jpeg' });
@@ -143,10 +143,19 @@
         if (ws !== newWs) return;  // stale socket, ignore
         wsConnecting = false;
         showIdle();
+        // Try to reconnect after 1.5s
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           if (wsUrl) connectWebSocket(wsUrl);
         }, 1500);
+        // If still no connection after 8s, assume sender stopped intentionally
+        // and shut down the cast app so the TV returns to its home screen
+        setTimeout(() => {
+          if (wsUrl && (!ws || ws.readyState !== WebSocket.OPEN)) {
+            console.log('WS gone for 8s — stopping cast app');
+            cast.framework.CastReceiverContext.getInstance().stop();
+          }
+        }, 8000);
       };
     }
 
