@@ -75,20 +75,24 @@
     const frameImg = new Image();
     let   pendingBurl = null;
     frameImg.onload = () => {
+      console.log('frameImg.onload — size:', frameImg.width, 'x', frameImg.height, '| canvas display:', canvas.style.display);
       if (canvas.width !== frameImg.width || canvas.height !== frameImg.height) {
         canvas.width  = frameImg.width;
         canvas.height = frameImg.height;
       }
       ctx2d.drawImage(frameImg, 0, 0);
       if (pendingBurl) { URL.revokeObjectURL(pendingBurl); pendingBurl = null; }
+      console.log('frame drawn');
     };
 
     function showOnly(el) {
+      console.log('showOnly:', el.id || el.tagName);
       idle.style.display   = 'none';
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
       el.style.display     = 'block';
+      console.log('after showOnly — canvas:', canvas.style.display, 'idle:', idle.style.display);
     }
 
     function showIdle() {
@@ -124,12 +128,20 @@
       ws.onopen = () => {
         wsConnecting = false;
         console.log('WS connected');
-        // Don't show canvas yet — wait for first real frame so TV never sees black
+        console.log('canvas display (inline):', canvas.style.display);
+        console.log('canvas display (computed):', getComputedStyle(canvas).display);
+        console.log('idle display (inline):', idle.style.display);
+        console.log('idle display (computed):', getComputedStyle(idle).display);
       };
 
       ws.onmessage = (event) => {
+        const computedDisplay = getComputedStyle(canvas).display;
+        console.log('frame received, canvas computed display:', computedDisplay, 'data size:', event.data.byteLength);
         // Switch to canvas on first frame arrival (check computed style, not inline)
-        if (getComputedStyle(canvas).display === 'none') showOnly(canvas);
+        if (computedDisplay === 'none') {
+          console.log('calling showOnly(canvas)');
+          showOnly(canvas);
+        }
         // Revoke previous URL if still pending
         if (pendingBurl) { URL.revokeObjectURL(pendingBurl); }
         const blob  = new Blob([event.data], { type: 'image/jpeg' });
