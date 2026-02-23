@@ -124,11 +124,12 @@
       ws.onopen = () => {
         wsConnecting = false;
         console.log('WS connected');
-        showOnly(canvas);
+        // Don't show canvas yet — wait for first real frame so TV never sees black
       };
 
       ws.onmessage = (event) => {
-        if (idle.style.display !== 'none') showOnly(canvas);
+        // Switch to canvas on first frame arrival, not on open
+        if (canvas.style.display === 'none') showOnly(canvas);
         // Revoke previous URL if still pending
         if (pendingBurl) { URL.revokeObjectURL(pendingBurl); }
         const blob  = new Blob([event.data], { type: 'image/jpeg' });
