@@ -141,30 +141,33 @@
       };
 
       ws.onmessage = async (event) => {
-        frameCount++;
-        // Log FPS every 5 seconds
-        const now = Date.now();
-        if (now - lastFpsLog >= 5000) {
-          const fps = (frameCount / ((now - lastFpsLog) / 1000)).toFixed(1);
-          log('FPS:', fps, '| frames:', frameCount, '| bytes last:', event.data.byteLength);
-          frameCount = 0;
-          lastFpsLog = now;
-        }
-
-        try {
-          const bitmap = await createImageBitmap(
-            new Blob([event.data], { type: 'image/jpeg' })
-          );
-          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-            log('Canvas resize:', bitmap.width, 'x', bitmap.height);
-            canvas.width  = bitmap.width;
-            canvas.height = bitmap.height;
+          frameCount++;
+          // Log FIRST frame explicitly
+          if (frameCount === 1) {
+              log('First frame received:', event.data.byteLength, 'bytes');
           }
-          ctx2d.drawImage(bitmap, 0, 0);
-          bitmap.close();
-        } catch (e) {
-          log('Frame error:', e.message);
-        }
+          // Log FPS every 5 seconds
+          const now = Date.now();
+          if (now - lastFpsLog >= 5000) {
+              const fps = (frameCount / ((now - lastFpsLog) / 1000)).toFixed(1);
+              log('FPS:', fps, '| frames:', frameCount);
+              frameCount = 0;
+              lastFpsLog = now;
+          }
+          try {
+              const bitmap = await createImageBitmap(
+                  new Blob([event.data], { type: 'image/jpeg' })
+              );
+              if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+                  log('Canvas resize:', bitmap.width, 'x', bitmap.height);
+                  canvas.width  = bitmap.width;
+                  canvas.height = bitmap.height;
+              }
+              ctx2d.drawImage(bitmap, 0, 0);
+              bitmap.close();
+          } catch (e) {
+              log('Frame error:', e.message);
+          }
       };
 
       ws.onerror = (e) => log('WS error:', e.type);
