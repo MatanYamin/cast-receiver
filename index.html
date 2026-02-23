@@ -5,7 +5,6 @@
   <title>Mirror & Casting</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       background: #000;
       overflow: hidden;
@@ -13,11 +12,9 @@
       height: 100vh;
       font-family: -apple-system, 'Helvetica Neue', sans-serif;
     }
-
     #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
     #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
     #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
-
     #idle {
       display: flex;
       flex-direction: column;
@@ -28,7 +25,6 @@
       height: 100vh;
       background: #000;
     }
-
     #idle img.logo {
       width: 52px;
       height: 52px;
@@ -36,12 +32,24 @@
       border-radius: 8px;
       opacity: 0.7;
     }
-
     #idle p {
       font-size: 16px;
       font-weight: 400;
       color: rgba(255,255,255,0.3);
       letter-spacing: 0.2px;
+    }
+    #debug {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      color: rgba(255,255,0,0.7);
+      font-size: 11px;
+      font-family: monospace;
+      pointer-events: none;
+      z-index: 9999;
+      max-height: 120px;
+      overflow: hidden;
     }
   </style>
 </head>
@@ -54,62 +62,61 @@
   <canvas id="canvas"></canvas>
   <video  id="video" autoplay playsinline></video>
   <img    id="image" />
+  <div    id="debug"></div>
 
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <script>
-    const canvas         = document.getElementById('canvas');
-    const ctx2d          = canvas.getContext('2d');
-    const video          = document.getElementById('video');
-    const image          = document.getElementById('image');
-    const idle           = document.getElementById('idle');
+    // ── Debug logger (shows on screen + console) ─────────────────────────────
+    const debugEl = document.getElementById('debug');
+    const logLines = [];
+    function log(...args) {
+      const msg = args.join(' ');
+      console.log('[MIRROR]', msg);
+      logLines.push(msg);
+      if (logLines.length > 8) logLines.shift();
+      debugEl.innerText = logLines.join('\n');
+    }
 
-    let wsUrl        = null;
-    let ws           = null;
-    let wsConnecting = false;  // guard against duplicate connections
-    let reconnectTimer = null;
+    // ── Elements ─────────────────────────────────────────────────────────────
+    const canvas = document.getElementById('canvas');
+    const ctx2d  = canvas.getContext('2d');
+    const video  = document.getElementById('video');
+    const image  = document.getElementById('image');
+    const idle   = document.getElementById('idle');
 
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
+    log('Screen:', canvas.width, 'x', canvas.height);
 
-    // Reuse a single Image object to avoid GC pressure at 30fps
-    const frameImg = new Image();
-    let   pendingBurl = null;
-    frameImg.onload = () => {
-      console.log('frameImg.onload — size:', frameImg.width, 'x', frameImg.height, '| canvas display:', canvas.style.display);
-      if (canvas.width !== frameImg.width || canvas.height !== frameImg.height) {
-        canvas.width  = frameImg.width;
-        canvas.height = frameImg.height;
-      }
-      ctx2d.drawImage(frameImg, 0, 0);
-      if (pendingBurl) { URL.revokeObjectURL(pendingBurl); pendingBurl = null; }
-      console.log('frame drawn');
-    };
+    let wsUrl          = null;
+    let ws             = null;
+    let reconnectTimer = null;
+    let frameCount     = 0;
+    let lastFpsLog     = Date.now();
 
+    // ── Show/hide helpers ─────────────────────────────────────────────────────
     function showOnly(el) {
-      console.log('showOnly:', el.id || el.tagName);
       idle.style.display   = 'none';
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
       el.style.display     = 'block';
-      console.log('after showOnly — canvas:', canvas.style.display, 'idle:', idle.style.display);
+      log('Showing:', el.id);
     }
-
     function showIdle() {
       idle.style.display   = 'flex';
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
+      log('Showing: idle');
     }
 
-    // ── WebSocket mirror ─────────────────────────────────────────────────────
+    // ── WebSocket mirror ──────────────────────────────────────────────────────
     function connectWebSocket(url) {
-      // Cancel any pending reconnect
       if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
 
-      // Close existing socket cleanly before opening a new one
       if (ws) {
-        ws.onclose = null;  // prevent onclose from triggering another reconnect
+        ws.onclose = null;
         ws.onerror = null;
         if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
           ws.close();
@@ -118,7 +125,7 @@
       }
 
       wsUrl = url;
-      wsConnecting = true;
+      log('WS connecting to:', url);
       showIdle();
 
       const newWs = new WebSocket(url);
@@ -126,56 +133,68 @@
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
-        wsConnecting = false;
-        console.log('WS connected');
-        console.log('canvas display (inline):', canvas.style.display);
-        console.log('canvas display (computed):', getComputedStyle(canvas).display);
-        console.log('idle display (inline):', idle.style.display);
-        console.log('idle display (computed):', getComputedStyle(idle).display);
+        log('WS open — showing canvas');
+        showOnly(canvas);
+        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+        frameCount = 0;
+        lastFpsLog = Date.now();
       };
 
-      ws.onmessage = (event) => {
-        const computedDisplay = getComputedStyle(canvas).display;
-        console.log('frame received, canvas computed display:', computedDisplay, 'data size:', event.data.byteLength);
-        // Switch to canvas on first frame arrival (check computed style, not inline)
-        if (computedDisplay === 'none') {
-          console.log('calling showOnly(canvas)');
-          showOnly(canvas);
+      ws.onmessage = async (event) => {
+        frameCount++;
+        // Log FPS every 5 seconds
+        const now = Date.now();
+        if (now - lastFpsLog >= 5000) {
+          const fps = (frameCount / ((now - lastFpsLog) / 1000)).toFixed(1);
+          log('FPS:', fps, '| frames:', frameCount, '| bytes last:', event.data.byteLength);
+          frameCount = 0;
+          lastFpsLog = now;
         }
-        // Revoke previous URL if still pending
-        if (pendingBurl) { URL.revokeObjectURL(pendingBurl); }
-        const blob  = new Blob([event.data], { type: 'image/jpeg' });
-        pendingBurl = URL.createObjectURL(blob);
-        frameImg.src = pendingBurl;
+
+        try {
+          const bitmap = await createImageBitmap(
+            new Blob([event.data], { type: 'image/jpeg' })
+          );
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            log('Canvas resize:', bitmap.width, 'x', bitmap.height);
+            canvas.width  = bitmap.width;
+            canvas.height = bitmap.height;
+          }
+          ctx2d.drawImage(bitmap, 0, 0);
+          bitmap.close();
+        } catch (e) {
+          log('Frame error:', e.message);
+        }
       };
 
-      ws.onerror = (e) => console.error('WS error', e);
+      ws.onerror = (e) => log('WS error:', e.type);
 
-      ws.onclose = () => {
-          if (ws !== newWs) return;
-          wsConnecting = false;
-          showIdle();
-          // Reconnect after 1.5s
-          reconnectTimer = setTimeout(() => {
-              reconnectTimer = null;
-              if (wsUrl) connectWebSocket(wsUrl);
-          }, 1500);
-          // REMOVED: the 8s self-stop that was killing the receiver between sessions
+      ws.onclose = (e) => {
+        if (ws !== newWs) return;
+        log('WS closed, code:', e.code, '— reconnecting in 1.5s');
+        showIdle();
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (wsUrl) connectWebSocket(wsUrl);
+        }, 1500);
       };
+    }
 
-    // ── Image ────────────────────────────────────────────────────────────────
+    // ── Image display ─────────────────────────────────────────────────────────
     function displayImage(url) {
+      log('Displaying image:', url);
       showOnly(image);
       image.src = url;
     }
 
-    // ── Cast SDK ─────────────────────────────────────────────────────────────
+    // ── Cast SDK ──────────────────────────────────────────────────────────────
     const castCtx = cast.framework.CastReceiverContext.getInstance();
     const pm = castCtx.getPlayerManager();
 
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {
       const url         = (request.media && request.media.contentUrl) || '';
       const contentType = (request.media && request.media.contentType) || '';
+      log('LOAD intercepted:', contentType, url.substring(0, 60));
 
       if (url.startsWith('ws://') || url.startsWith('wss://')) {
         connectWebSocket(url);
@@ -190,8 +209,14 @@
       return request;
     });
 
-    castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => showIdle());
+    castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => {
+      log('Cast shutdown event');
+      showIdle();
+    });
+
+    log('Cast receiver starting...');
     castCtx.start({ maxInactivity: 3600 });
+    log('Cast receiver started');
   </script>
 </body>
 </html>
