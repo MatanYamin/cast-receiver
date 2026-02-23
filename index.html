@@ -152,24 +152,16 @@
       ws.onerror = (e) => console.error('WS error', e);
 
       ws.onclose = () => {
-        if (ws !== newWs) return;  // stale socket, ignore
-        wsConnecting = false;
-        showIdle();
-        // Try to reconnect after 1.5s
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          if (wsUrl) connectWebSocket(wsUrl);
-        }, 1500);
-        // If still no connection after 8s, assume sender stopped intentionally
-        // and shut down the cast app so the TV returns to its home screen
-        setTimeout(() => {
-          if (wsUrl && (!ws || ws.readyState !== WebSocket.OPEN)) {
-            console.log('WS gone for 8s — stopping cast app');
-            cast.framework.CastReceiverContext.getInstance().stop();
-          }
-        }, 8000);
+          if (ws !== newWs) return;
+          wsConnecting = false;
+          showIdle();
+          // Reconnect after 1.5s
+          reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
+              if (wsUrl) connectWebSocket(wsUrl);
+          }, 1500);
+          // REMOVED: the 8s self-stop that was killing the receiver between sessions
       };
-    }
 
     // ── Image ────────────────────────────────────────────────────────────────
     function displayImage(url) {
