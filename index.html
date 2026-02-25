@@ -185,6 +185,13 @@
     });
 
     castCtx.start({ maxInactivity: 3600 });
+
+    // Send periodic ping to keep session alive
+    setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+        }
+    }, 20000);
   </script>
 </body>
 </html>
