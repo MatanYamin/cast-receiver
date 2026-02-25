@@ -15,7 +15,7 @@
     #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
     #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
     #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
-      @font-face {
+    @font-face {
       font-family: 'Croogla';
       src: url('./Croogla4F.ttf') format('truetype');
     }
@@ -33,14 +33,12 @@
       font-size: 28px;
       font-weight: 300;
       letter-spacing: 0.5px;
-      color: rgba(255,255,255,0.85);
-      font-family: 'Croogla', sans-serif;   /* ← add this line */
+      color: rgba(255,255,255,0.8);
+      font-family: 'Croogla', sans-serif;
       text-shadow:
-        0 0 12px rgba(255,255,255,0.6),
-        0 0 28px rgba(255,255,255,0.25),
-        0 0 55px rgba(180,210,255,0.15);
+        0 0 8px rgba(255,255,255,0.2),
+        0 0 20px rgba(180,210,255,0.08);
     }
-
     #idle-logo {
       position: absolute;
       bottom: 48px;
@@ -110,6 +108,15 @@
         if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
         ws = null;
       }
+
+      // ?s=idle means "show idle screen" — don't actually connect WS
+      const params = new URLSearchParams(url.split('?')[1] || '');
+      if (params.get('s') === 'idle') {
+        wsUrl = null;
+        showIdle();
+        return;
+      }
+
       wsUrl = url;
       showIdle();
 
@@ -138,10 +145,13 @@
       ws.onclose = (e) => {
         if (ws !== newWs) return;
         showIdle();
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          if (wsUrl) connectWebSocket(wsUrl);
-        }, 1500);
+        // Only auto-reconnect for real mirror sessions, not idle
+        if (wsUrl) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            if (wsUrl) connectWebSocket(wsUrl);
+          }, 1500);
+        }
       };
     }
 
