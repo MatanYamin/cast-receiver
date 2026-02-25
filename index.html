@@ -37,7 +37,9 @@
       font-family: 'Croogla', sans-serif;
       text-shadow:
         0 0 8px rgba(255,255,255,0.2),
-        0 0 20px rgba(180,210,255,0.08);
+        0 0 20px rgba(180,210,255,0.08),
+        0 2px 12px rgba(0,0,0,0.85),
+        0 4px 32px rgba(0,0,0,0.6);
     }
     #idle-logo {
       position: absolute;
@@ -71,6 +73,11 @@
   <video  id="video" autoplay playsinline></video>
   <img    id="image" />
 
+  <!-- Silent looping audio — keeps Cast media session alive, prevents 300s idle timeout -->
+  <audio id="keepalive-audio" loop>
+    <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+  </audio>
+
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <script>
     const canvas = document.getElementById('canvas');
@@ -79,6 +86,7 @@
     const image  = document.getElementById('image');
     const idle   = document.getElementById('idle');
     const idleText = document.getElementById('idle-text');
+    const keepaliveAudio = document.getElementById('keepalive-audio');
 
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
@@ -99,6 +107,7 @@
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
+      keepaliveAudio.pause();
     }
 
     function connectWebSocket(url) {
@@ -127,6 +136,7 @@
       ws.onopen = () => {
         showOnly(canvas);
         ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+        keepaliveAudio.play().catch(() => {});
       };
 
       ws.onmessage = async (event) => {
@@ -186,11 +196,11 @@
 
     castCtx.start({ maxInactivity: 3600 });
 
-    // Send periodic ping to keep session alive
+    // Send periodic ping to keep WebSocket connection alive
     setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-        }
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
     }, 20000);
   </script>
 </body>
