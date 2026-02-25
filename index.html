@@ -15,6 +15,10 @@
     #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
     #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
     #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
+      @font-face {
+      font-family: 'Croogla';
+      src: url('./Croogla4F.ttf') format('truetype');
+    }
     #idle {
       display: flex;
       flex-direction: column;
@@ -30,11 +34,13 @@
       font-weight: 300;
       letter-spacing: 0.5px;
       color: rgba(255,255,255,0.85);
+      font-family: 'Croogla', sans-serif;   /* ← add this line */
       text-shadow:
         0 0 12px rgba(255,255,255,0.6),
         0 0 28px rgba(255,255,255,0.25),
         0 0 55px rgba(180,210,255,0.15);
     }
+
     #idle-logo {
       position: absolute;
       bottom: 48px;
