@@ -73,11 +73,6 @@
   <video  id="video" autoplay playsinline></video>
   <img    id="image" />
 
-  <!-- Silent looping audio — keeps Cast media session alive, prevents 300s idle timeout -->
-  <audio id="keepalive-audio" loop>
-    <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
-  </audio>
-
   <script>
       // Prevent CAF's internal idle timers from killing the session.
       // CAF uses setTimeout internally for its IdleTimeoutManager.
@@ -100,7 +95,6 @@
     const image  = document.getElementById('image');
     const idle   = document.getElementById('idle');
     const idleText = document.getElementById('idle-text');
-    const keepaliveAudio = document.getElementById('keepalive-audio');
 
     canvas.width  = window.screen.width  || 1920;
     canvas.height = window.screen.height || 1080;
@@ -121,7 +115,6 @@
       canvas.style.display = 'none';
       video.style.display  = 'none';
       image.style.display  = 'none';
-      keepaliveAudio.pause();
     }
 
     function connectWebSocket(url) {
@@ -150,7 +143,6 @@
       ws.onopen = () => {
         showOnly(canvas);
         ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-        keepaliveAudio.play().catch(() => {});
       };
 
       ws.onmessage = async (event) => {
