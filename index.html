@@ -78,6 +78,20 @@
     <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
   </audio>
 
+  <script>
+      // Prevent CAF's internal idle timers from killing the session.
+      // CAF uses setTimeout internally for its IdleTimeoutManager.
+      const _origSetTimeout = window.setTimeout;
+      window.setTimeout = function(fn, delay) {
+          // Block any timeout longer than 60s set by cast framework scripts
+          // (these are all idle-kill timers — our own app timers are much shorter)
+          if (delay >= 60000 && new Error().stack.includes('cast_receiver_framework')) {
+              return -1;
+          }
+          return _origSetTimeout.apply(this, arguments);
+      };
+  </script>
+  
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <script>
     const canvas = document.getElementById('canvas');
@@ -194,7 +208,10 @@
       showIdle();
     });
 
-    castCtx.start({ maxInactivity: 3600 });
+    castCtx.start({
+        maxInactivity: 3600,
+        disableIdleTimeout: true   // ← THIS is what kills you after 5 minutes
+    });
 
     // Send periodic ping to keep WebSocket connection alive
     setInterval(() => {
