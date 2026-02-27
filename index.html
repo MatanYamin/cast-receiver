@@ -180,21 +180,31 @@
     const pm = castCtx.getPlayerManager();
 
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {
-      const url         = (request.media && request.media.contentUrl) || '';
-      const contentType = (request.media && request.media.contentType) || '';
-
-      if (url.startsWith('ws://') || url.startsWith('wss://')) {
-        connectWebSocket(url);
-        return null;
-      } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
-        displayImage(url);
-        return null;
-      } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
-        showOnly(video);
-        return request;
-      }
+    const url         = (request.media && request.media.contentUrl) || '';
+    const contentType = (request.media && request.media.contentType) || '';
+  
+    if (url.startsWith('ws://') || url.startsWith('wss://')) {
+      connectWebSocket(url);
+      return null;
+    } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
+      // ── CANCEL any pending WS reconnect ──────────────────────────────────
+      wsUrl = null;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }
+      // ─────────────────────────────────────────────────────────────────────
+      displayImage(url);
+      return null;
+    } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
+      // ── CANCEL any pending WS reconnect ──────────────────────────────────
+      wsUrl = null;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }
+      // ─────────────────────────────────────────────────────────────────────
+      showOnly(video);
       return request;
-    });
+    }
+    return request;
+  });
 
     castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => {
       showIdle();
