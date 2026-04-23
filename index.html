@@ -1,228 +1,330 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Mirror & Casting</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #000;
-      overflow: hidden;
-      width: 100vw;
-      height: 100vh;
-      font-family: -apple-system, 'Helvetica Neue', sans-serif;
-    }
-    #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
-    #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
-    #image  { width: 100%; height: 100%; object-fit: contain; display: none; }
-    @font-face {
-      font-family: 'Croogla';
-      src: url('./Croogla4F.ttf') format('truetype');
-    }
-    #idle {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100vw;
-      height: 100vh;
-      background: #000;
-      position: relative;
-    }
-    #idle-text {
-      font-size: 34px;
-      font-weight: 300;
-      letter-spacing: 0.5px;
-      color: rgba(255,255,255,0.8);
-      font-family: 'Croogla', sans-serif;
-      text-shadow:
-        0 0 18px rgba(255,255,255,0.35),
-        0 0 40px rgba(255,255,255,0.15),
-        0 0 8px rgba(255,255,255,0.2),
-        0 0 20px rgba(180,210,255,0.08),
-        0 2px 12px rgba(0,0,0,0.85),
-        0 4px 32px rgba(0,0,0,0.6);
-    }
-    #idle-logo {
-      position: absolute;
-      bottom: 48px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-    }
-    #idle-logo img {
-      width: 72px;
-      height: 72px;
-      object-fit: contain;
-      border-radius: 10px;
-      opacity: 0.5;
-      filter: drop-shadow(0 0 10px rgba(255,255,255,0.15));
-    }
-  </style>
-</head>
-<body>
-  <div id="idle">
-    <p id="idle-text">Ready to cast &amp; mirror</p>
-    <div id="idle-logo">
-      <img src="./logo.png" onerror="this.style.display='none'" />
-    </div>
-  </div>
-
-  <canvas id="canvas"></canvas>
-  <video  id="video" autoplay playsinline></video>
-  <img    id="image" />
-
-  <script>
-      // Prevent CAF's internal idle timers from killing the session.
-      // CAF uses setTimeout internally for its IdleTimeoutManager.
-      const _origSetTimeout = window.setTimeout;
-      window.setTimeout = function(fn, delay) {
-          // Block any timeout longer than 60s set by cast framework scripts
-          // (these are all idle-kill timers — our own app timers are much shorter)
-          if (delay >= 60000 && new Error().stack.includes('cast_receiver_framework')) {
-              return -1;
-          }
-          return _origSetTimeout.apply(this, arguments);
-      };
-  </script>
+<!DOCTYPE html>                                                                                                                                                                                                                                                            
+  <html>                                                                                                                                                                                                                                                                     
+  <head>                                                                                                                                                                                                                                                                     
+    <meta charset="utf-8">
+    <title>Mirror & Casting</title>                                                                                                                                                                                                                                          
+    <style>                                                                                                                                                                                                                                                                  
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {                                                                                                                                                                                                                                                                 
+        background: #000;                                                                                                                                                                                                                                                  
+        overflow: hidden;
+        width: 100vw;                                                                                                                                                                                                                                                        
+        height: 100vh;
+        font-family: -apple-system, 'Helvetica Neue', sans-serif;                                                                                                                                                                                                            
+      }                                                                                                                                                                                                                                                                      
+      #canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
+      #video  { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }                                                                                                                                                                           
+      #image  { width: 100%; height: 100%; object-fit: contain; display: none; }                                                                                                                                                                                           
+      @font-face {                                                                                                                                                                                                                                                           
+        font-family: 'Croogla';                                                                                                                                                                                                                                            
+        src: url('./Croogla4F.ttf') format('truetype');                                                                                                                                                                                                                      
+      }                                                                                                                                                                                                                                                                    
+      #idle {                                                                                                                                                                                                                                                                
+        display: flex;                                                                                                                                                                                                                                                       
+        flex-direction: column;
+        align-items: center;                                                                                                                                                                                                                                                 
+        justify-content: center;                                                                                                                                                                                                                                           
+        width: 100vw;
+        height: 100vh;
+        background: #000;                                                                                                                                                                                                                                                    
+        position: relative;
+      }                                                                                                                                                                                                                                                                      
+      #idle-text {                                                                                                                                                                                                                                                         
+        font-size: 34px;
+        font-weight: 300;
+        letter-spacing: 0.5px;                                                                                                                                                                                                                                               
+        color: rgba(255,255,255,0.8);
+        font-family: 'Croogla', sans-serif;                                                                                                                                                                                                                                  
+        text-shadow:                                                                                                                                                                                                                                                       
+          0 0 18px rgba(255,255,255,0.35),                                                                                                                                                                                                                                   
+          0 0 40px rgba(255,255,255,0.15),                                                                                                                                                                                                                                   
+          0 0 8px rgba(255,255,255,0.2),
+          0 0 20px rgba(180,210,255,0.08),                                                                                                                                                                                                                                   
+          0 2px 12px rgba(0,0,0,0.85),                                                                                                                                                                                                                                       
+          0 4px 32px rgba(0,0,0,0.6);                                                                                                                                                                                                                                        
+      }                                                                                                                                                                                                                                                                      
+      #idle-logo {                                                                                                                                                                                                                                                           
+        position: absolute;                                                                                                                                                                                                                                                
+        bottom: 48px;                                                                                                                                                                                                                                                        
+        left: 50%;
+        transform: translateX(-50%);                                                                                                                                                                                                                                         
+        display: flex;                                                                                                                                                                                                                                                     
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }                                                                                                                                                                                                                                                                      
+      #idle-logo img {
+        width: 72px;                                                                                                                                                                                                                                                         
+        height: 72px;                                                                                                                                                                                                                                                      
+        object-fit: contain;
+        border-radius: 10px;
+        opacity: 0.5;                                                                                                                                                                                                                                                        
+        filter: drop-shadow(0 0 10px rgba(255,255,255,0.15));
+      }                                                                                                                                                                                                                                                                      
+    </style>                                                                                                                                                                                                                                                               
+  </head>                                                                                                                                                                                                                                                                    
+  <body>                                                                                                                                                                                                                                                                   
+    <div id="idle">
+      <p id="idle-text">Ready to cast &amp; mirror</p>
+      <div id="idle-logo">                                                                                                                                                                                                                                                   
+        <img src="./logo.png" onerror="this.style.display='none'" />
+      </div>                                                                                                                                                                                                                                                                 
+    </div>                                                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                                             
+    <canvas id="canvas"></canvas>                                                                                                                                                                                                                                          
+    <video  id="video" autoplay playsinline></video>
+    <img    id="image" />                                                                                                                                                                                                                                                    
   
-  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-  <script>
-    const canvas = document.getElementById('canvas');
-    const ctx2d  = canvas.getContext('2d');
-    const video  = document.getElementById('video');
-    const image  = document.getElementById('image');
-    const idle   = document.getElementById('idle');
-    const idleText = document.getElementById('idle-text');
-
-    canvas.width  = window.screen.width  || 1920;
-    canvas.height = window.screen.height || 1080;
-
-    let wsUrl          = null;
-    let ws             = null;
-    let reconnectTimer = null;
-
-    function showOnly(el) {
-      idle.style.display   = 'none';
-      canvas.style.display = 'none';
-      video.style.display  = 'none';
-      image.style.display  = 'none';
-      el.style.display     = 'block';
-    }
-    function showIdle() {
-      idle.style.display   = 'flex';
-      canvas.style.display = 'none';
-      video.style.display  = 'none';
-      image.style.display  = 'none';
-    }
-
-    function connectWebSocket(url) {
-      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-      if (ws) {
-        ws.onclose = null; ws.onerror = null;
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
-        ws = null;
+    <script>                                                                                                                                                                                                                                                                 
+        // Prevent CAF's internal idle timers from killing the session.                                                                                                                                                                                                    
+        const _origSetTimeout = window.setTimeout;                                                                                                                                                                                                                           
+        window.setTimeout = function(fn, delay) {
+            if (delay >= 60000 && new Error().stack.includes('cast_receiver_framework')) {                                                                                                                                                                                   
+                return -1;                                                                                                                                                                                                                                                   
+            }                                                                                                                                                                                                                                                                
+            return _origSetTimeout.apply(this, arguments);                                                                                                                                                                                                                   
+        };                                                                                                                                                                                                                                                                   
+    </script>
+                                                                                                                                                                                                                                                                             
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>                                                                                                                                                                 
+    <script>
+      const canvas = document.getElementById('canvas');                                                                                                                                                                                                                      
+      const ctx2d  = canvas.getContext('2d');                                                                                                                                                                                                                                
+      const video  = document.getElementById('video');
+      const image  = document.getElementById('image');                                                                                                                                                                                                                       
+      const idle   = document.getElementById('idle');                                                                                                                                                                                                                        
+      const idleText = document.getElementById('idle-text');
+                                                                                                                                                                                                                                                                             
+      canvas.width  = window.screen.width  || 1920;                                                                                                                                                                                                                          
+      canvas.height = window.screen.height || 1080;
+                                                                                                                                                                                                                                                                             
+      let wsUrl          = null;                                                                                                                                                                                                                                             
+      let ws             = null;
+      let reconnectTimer = null;                                                                                                                                                                                                                                             
+                                                                                                                                                                                                                                                                           
+      // ── Audio streaming state ──────────────────────────────────────────────                                                                                                                                                                                             
+      let audioWs        = null;
+      let audioCtx       = null;                                                                                                                                                                                                                                             
+      let audioProcessor = null;                                                                                                                                                                                                                                             
+      let audioQueue     = [];
+      // ────────────────────────────────────────────────────────────────────────                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                             
+      function showOnly(el) {
+        idle.style.display   = 'none';                                                                                                                                                                                                                                       
+        canvas.style.display = 'none';                                                                                                                                                                                                                                       
+        video.style.display  = 'none';
+        image.style.display  = 'none';                                                                                                                                                                                                                                       
+        el.style.display     = 'block';                                                                                                                                                                                                                                    
       }
-
-      // ?s=idle means "show idle screen" — don't actually connect WS
-      const params = new URLSearchParams(url.split('?')[1] || '');
-      if (params.get('s') === 'idle') {
-        wsUrl = null;
-        showIdle();
-        return;
+      function showIdle() {                                                                                                                                                                                                                                                  
+        idle.style.display   = 'flex';
+        canvas.style.display = 'none';                                                                                                                                                                                                                                       
+        video.style.display  = 'none';                                                                                                                                                                                                                                     
+        image.style.display  = 'none';                                                                                                                                                                                                                                       
       }
+                                                                                                                                                                                                                                                                             
+      // ── Audio streaming ────────────────────────────────────────────────────                                                                                                                                                                                             
+   
+      function startAudioStream(audioUrl) {                                                                                                                                                                                                                                  
+        stopAudioStream();                                                                                                                                                                                                                                                 
 
-      wsUrl = url;
-      showIdle();
-
-      const newWs = new WebSocket(url);
-      ws = newWs;
-      ws.binaryType = 'arraybuffer';
-
-      ws.onopen = () => {
-        showOnly(canvas);
-        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const bitmap = await createImageBitmap(new Blob([event.data], { type: 'image/jpeg' }));
-          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-            canvas.width = bitmap.width; canvas.height = bitmap.height;
-          }
-          ctx2d.drawImage(bitmap, 0, 0);
-          bitmap.close();
-        } catch (e) {}
-      };
-
-      ws.onerror = () => {};
-
-      ws.onclose = (e) => {
-        if (ws !== newWs) return;
-        showIdle();
-        // Only auto-reconnect for real mirror sessions, not idle
-        if (wsUrl) {
-          reconnectTimer = setTimeout(() => {
-            reconnectTimer = null;
-            if (wsUrl) connectWebSocket(wsUrl);
-          }, 1500);
+        try {                                                                                                                                                                                                                                                                
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {                                                                                                                                                                                                                                                        
+          return;                                                                                                                                                                                                                                                          
         }
-      };
-    }
 
-    function displayImage(url) {
-      showOnly(image);
-      image.src = url;
-    }
+        // ScriptProcessorNode: 4096 buffer, 0 inputs, 1 mono output                                                                                                                                                                                                         
+        audioProcessor = audioCtx.createScriptProcessor(4096, 0, 1);
+        audioProcessor.onaudioprocess = function(e) {                                                                                                                                                                                                                        
+          var output = e.outputBuffer.getChannelData(0);                                                                                                                                                                                                                     
+          var written = 0;
+                                                                                                                                                                                                                                                                             
+          while (written < output.length && audioQueue.length > 0) {                                                                                                                                                                                                         
+            var chunk = audioQueue[0];
+            var offset = chunk._offset || 0;                                                                                                                                                                                                                                 
+            var available = chunk.length - offset;                                                                                                                                                                                                                           
+            var needed = output.length - written;
+            var toCopy = Math.min(available, needed);                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                                           
+            for (var i = 0; i < toCopy; i++) {                                                                                                                                                                                                                               
+              output[written + i] = chunk[offset + i];                                                                                                                                                                                                                     
+            }
+            written += toCopy;                                                                                                                                                                                                                                               
+            chunk._offset = offset + toCopy;
+                                                                                                                                                                                                                                                                             
+            if (chunk._offset >= chunk.length) {                                                                                                                                                                                                                           
+              audioQueue.shift();
+            }
+          }                                                                                                                                                                                                                                                                  
+   
+          // Fill remaining with silence                                                                                                                                                                                                                                     
+          for (var i = written; i < output.length; i++) {                                                                                                                                                                                                                  
+            output[i] = 0;                                                                                                                                                                                                                                                   
+          }
+        };                                                                                                                                                                                                                                                                   
+        audioProcessor.connect(audioCtx.destination);                                                                                                                                                                                                                      
 
-    const castCtx = cast.framework.CastReceiverContext.getInstance();
-    const pm = castCtx.getPlayerManager();
-
-    pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {
-    const url         = (request.media && request.media.contentUrl) || '';
-    const contentType = (request.media && request.media.contentType) || '';
+        audioWs = new WebSocket(audioUrl);
+        audioWs.binaryType = 'arraybuffer';
+                                                                                                                                                                                                                                                                             
+        audioWs.onmessage = function(event) {
+          var data = new DataView(event.data);                                                                                                                                                                                                                               
+          if (data.byteLength <= 4) return;                                                                                                                                                                                                                                  
+   
+          // Wire format: [UInt32 LE sampleRate][Int16 LE mono PCM...]                                                                                                                                                                                                       
+          // Skip first 4 bytes (sample rate header)                                                                                                                                                                                                                       
+          var sampleCount = (data.byteLength - 4) / 2;                                                                                                                                                                                                                       
+          var samples = new Float32Array(sampleCount);                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                             
+          for (var i = 0; i < sampleCount; i++) {                                                                                                                                                                                                                          
+            samples[i] = data.getInt16(4 + i * 2, true) / 32768.0;                                                                                                                                                                                                           
+          }                                                                                                                                                                                                                                                                  
   
-    if (url.startsWith('ws://') || url.startsWith('wss://')) {
-      connectWebSocket(url);
-      return null;
-    } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {
-      // ── CANCEL any pending WS reconnect ──────────────────────────────────
-      wsUrl = null;
-      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-      if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }
-      // ─────────────────────────────────────────────────────────────────────
-      displayImage(url);
-      return null;
-    } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {
-      // ── CANCEL any pending WS reconnect ──────────────────────────────────
-      wsUrl = null;
-      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-      if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }
-      // ─────────────────────────────────────────────────────────────────────
-      showOnly(video);
-      return request;
-    }
-    return request;
-  });
+          // Bound queue to prevent memory growth (~20 chunks ≈ 2s of audio)                                                                                                                                                                                                 
+          while (audioQueue.length > 20) {                                                                                                                                                                                                                                 
+            audioQueue.shift();                                                                                                                                                                                                                                              
+          }                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                             
+          samples._offset = 0;                                                                                                                                                                                                                                             
+          audioQueue.push(samples);
+        };
 
-    castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => {
-      showIdle();
-    });
-
-    castCtx.start({
-        maxInactivity: 3600,
-        disableIdleTimeout: true   // ← THIS is what kills you after 5 minutes
-    });
-
-    // Send periodic ping to keep WebSocket connection alive
-    setInterval(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'ping' }));
+        audioWs.onerror = function() {};                                                                                                                                                                                                                                     
+        audioWs.onclose = function() {};
+      }                                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                           
+      function stopAudioStream() {
+        if (audioWs) {
+          audioWs.onclose = null;
+          audioWs.onerror = null;                                                                                                                                                                                                                                            
+          if (audioWs.readyState === WebSocket.OPEN || audioWs.readyState === WebSocket.CONNECTING) {
+            audioWs.close();                                                                                                                                                                                                                                                 
+          }                                                                                                                                                                                                                                                                
+          audioWs = null;                                                                                                                                                                                                                                                    
+        }                                                                                                                                                                                                                                                                  
+        if (audioProcessor) {
+          audioProcessor.disconnect();
+          audioProcessor = null;
+        }
+        if (audioCtx) {
+          audioCtx.close().catch(function(){});                                                                                                                                                                                                                              
+          audioCtx = null;
+        }                                                                                                                                                                                                                                                                    
+        audioQueue = [];                                                                                                                                                                                                                                                   
       }
-    }, 20000);
-  </script>
-</body>
-</html>
+
+      // ── Video WebSocket ────────────────────────────────────────────────────                                                                                                                                                                                             
+  
+      function connectWebSocket(url, customData) {                                                                                                                                                                                                                           
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }                                                                                                                                                                                       
+        if (ws) {                                                                                                                                                                                                                                                            
+          ws.onclose = null; ws.onerror = null;                                                                                                                                                                                                                              
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+          ws = null;                                                                                                                                                                                                                                                         
+        }                                                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                                                             
+        // ?s=idle means "show idle screen"                                                                                                                                                                                                                                  
+        const params = new URLSearchParams(url.split('?')[1] || '');
+        if (params.get('s') === 'idle') {                                                                                                                                                                                                                                    
+          wsUrl = null;                                                                                                                                                                                                                                                    
+          stopAudioStream();                                                                                                                                                                                                                                                 
+          showIdle();
+          return;                                                                                                                                                                                                                                                            
+        }                                                                                                                                                                                                                                                                  
+
+        wsUrl = url;
+        showIdle();
+
+        // Start audio stream if audioUrl provided in customData                                                                                                                                                                                                             
+        if (customData && customData.audioUrl) {
+          startAudioStream(customData.audioUrl);                                                                                                                                                                                                                             
+        }                                                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                                                             
+        const newWs = new WebSocket(url);                                                                                                                                                                                                                                  
+        ws = newWs;
+        ws.binaryType = 'arraybuffer';
+                                                                                                                                                                                                                                                                             
+        ws.onopen = () => {
+          showOnly(canvas);                                                                                                                                                                                                                                                  
+          ctx2d.clearRect(0, 0, canvas.width, canvas.height);                                                                                                                                                                                                              
+        };                                                                                                                                                                                                                                                                   
+   
+        ws.onmessage = async (event) => {                                                                                                                                                                                                                                    
+          try {                                                                                                                                                                                                                                                            
+            const bitmap = await createImageBitmap(new Blob([event.data], { type: 'image/jpeg' }));
+            if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {                                                                                                                                                                                          
+              canvas.width = bitmap.width; canvas.height = bitmap.height;                                                                                                                                                                                                    
+            }                                                                                                                                                                                                                                                                
+            ctx2d.drawImage(bitmap, 0, 0);                                                                                                                                                                                                                                   
+            bitmap.close();                                                                                                                                                                                                                                                
+          } catch (e) {}                                                                                                                                                                                                                                                     
+        };
+                                                                                                                                                                                                                                                                             
+        ws.onerror = () => {};                                                                                                                                                                                                                                             
+
+        ws.onclose = (e) => {
+          if (ws !== newWs) return;
+          showIdle();                                                                                                                                                                                                                                                        
+          if (wsUrl) {
+            reconnectTimer = setTimeout(() => {                                                                                                                                                                                                                              
+              reconnectTimer = null;                                                                                                                                                                                                                                         
+              if (wsUrl) connectWebSocket(wsUrl, customData);
+            }, 1500);                                                                                                                                                                                                                                                        
+          }                                                                                                                                                                                                                                                                
+        };
+      }                                                                                                                                                                                                                                                                      
+  
+      function displayImage(url) {                                                                                                                                                                                                                                           
+        showOnly(image);                                                                                                                                                                                                                                                   
+        image.src = url;
+      }
+
+      const castCtx = cast.framework.CastReceiverContext.getInstance();                                                                                                                                                                                                      
+      const pm = castCtx.getPlayerManager();
+                                                                                                                                                                                                                                                                             
+      pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (request) => {                                                                                                                                                                                      
+        const url         = (request.media && request.media.contentUrl) || '';
+        const contentType = (request.media && request.media.contentType) || '';                                                                                                                                                                                              
+        const customData  = (request.media && request.media.customData) || null;                                                                                                                                                                                             
+  
+        if (url.startsWith('ws://') || url.startsWith('wss://')) {                                                                                                                                                                                                           
+          connectWebSocket(url, customData);                                                                                                                                                                                                                               
+          return null;                                                                                                                                                                                                                                                       
+        } else if (contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic)$/i.test(url)) {                                                                                                                                                                     
+          wsUrl = null;                                                                                                                                                                                                                                                      
+          if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }                                                                                                                                                                                       
+          if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }                                                                                                                                                                                           
+          stopAudioStream();                                                                                                                                                                                                                                                 
+          displayImage(url);                                                                                                                                                                                                                                               
+          return null;                                                                                                                                                                                                                                                       
+        } else if (contentType.startsWith('video/') || /\.(mp4|mov|m4v|webm)$/i.test(url)) {                                                                                                                                                                               
+          wsUrl = null;                                                                                                                                                                                                                                                      
+          if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+          if (ws) { ws.onclose = null; ws.onerror = null; ws.close(); ws = null; }                                                                                                                                                                                           
+          stopAudioStream();                                                                                                                                                                                                                                               
+          showOnly(video);                                                                                                                                                                                                                                                   
+          return request;                                                                                                                                                                                                                                                  
+        }                                                                                                                                                                                                                                                                    
+        return request;
+      });                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                           
+      castCtx.addEventListener(cast.framework.system.EventType.SHUTDOWN, () => {                                                                                                                                                                                             
+        stopAudioStream();
+        showIdle();                                                                                                                                                                                                                                                          
+      });                                                                                                                                                                                                                                                                  
+
+      castCtx.start({
+          maxInactivity: 3600,
+          disableIdleTimeout: true                                                                                                                                                                                                                                           
+      });
+                                                                                                                                                                                                                                                                             
+      // Send periodic ping to keep WebSocket connection alive                                                                                                                                                                                                             
+      setInterval(() => {                                                                                                                                                                                                                                                    
+        if (ws && ws.readyState === WebSocket.OPEN) {                                                                                                                                                                                                                      
+          ws.send(JSON.stringify({ type: 'ping' }));                                                                                                                                                                                                                         
+        }
+      }, 20000);                                                                                                                                                                                                                                                             
+    </script>                                                                                                                                                                                                                                                              
+  </body>
+  </html>
