@@ -216,7 +216,7 @@
         updateAudioDebug();                                                                                                                                 
                                                                                                                                                           
         // ScriptProcessorNode: 4096 buffer, 0 inputs, 1 mono output                                                                                        
-        audioProcessor = audioCtx.createScriptProcessor(4096, 0, 1);
+        audioProcessor = audioCtx.createScriptProcessor(2048, 0, 1);
         audioProcessor.onaudioprocess = function(e) {                                                                                                       
           var output = e.outputBuffer.getChannelData(0);                                                                                                  
           var written = 0;                                                                                                                                  
