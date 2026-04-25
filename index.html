@@ -300,7 +300,7 @@
           // Resample if source rate differs from AudioContext rate
           var resampled = resampleLinear(samples, srcRate, ctxRate);                                                                                        
                                                                                                                                                           
-          while (audioQueue.length > 2) {
+          while (audioQueue.length > 4) {
             audioQueue.shift();
           }
 
